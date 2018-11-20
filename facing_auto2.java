@@ -150,11 +150,6 @@ public class facing_auto2 extends LinearOpMode {
 
 
 
-    //PID CODE STARTS HERE
-    /**
-     * Resets the cumulative angle tracking to zero.
-     */
-
     private void resetAngle()
     {
         lastAngles = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
@@ -162,15 +157,16 @@ public class facing_auto2 extends LinearOpMode {
         globalAngle = 0;
     }
 
-
-
     /**
      * Get current cumulative angle rotation from last reset.
-     * @rerotate Angle in degrees. + = left, - = right from zero point.
+     * @return Angle in degrees. + = left, - = right.
      */
-
     private double getAngle()
     {
+        // We experimentally determined the Z axis is the axis we want to use for heading angle.
+        // We have to process the angle because the imu works in euler angles so the Z axis is
+        // returned as 0 to +180 or 0 to -180 rolling back to -179 or +179 when rotation passes
+        // 180 degrees. We detect this transition and track the total cumulative angle of rotation.
 
         Orientation angles = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
 
@@ -188,86 +184,110 @@ public class facing_auto2 extends LinearOpMode {
         return globalAngle;
     }
 
+    /**
+     * See if we are moving in a straight line and if not return a power correction value.
+     * @return Power adjustment, + is adjust left - is adjust right.
+     */
+    private double checkDirection()
+    {
+        // The gain value determines how sensitive the correction is to direction changes.
+        // You will have to experiment with your robot to get small smooth direction changes
+        // to stay on a straight line.
+        double correction, angle, gain = .10;
 
+        angle = getAngle();
+
+        if (angle == 0)
+            correction = 0;             // no adjustment.
+        else
+            correction = -angle;        // reverse sign of angle for correction.
+
+        correction = correction * gain;
+
+        return correction;
+    }
 
     /**
      * Rotate left or right the number of degrees. Does not support turning more than 180 degrees.
-     *
-
+     * @param degrees Degrees to turn, - is right + is left
      */
-
     private void rotate(int degrees, double power)
     {
-        // restart imu angle tracking.
-        resetAngle();
-        pidRotate.reset();
-        pidRotate.setSetpoint(degrees);
-        pidRotate.setInputRange(0, 90);
-        pidRotate.setOutputRange(.20, power);
-        pidRotate.setTolerance(50);
-        pidRotate.enable();
+        double  leftPower, rightPower;
 
-        // getAngle() rerotates + when rotating counter clockwise (left) and - when rotating
+        // restart imu movement tracking.
+        resetAngle();
+
+        // getAngle() returns + when rotating counter clockwise (left) and - when rotating
         // clockwise (right).
 
-        // rotate until rotate is completed.
+        if (degrees < 0)
+        {   // turn right.
+            leftPower = power;
+            rightPower = -power;
+        }
+        else if (degrees > 0)
+        {   // turn left.
+            leftPower = -power;
+            rightPower = power;
+        }
+        else return;
+
+        // set power to rotate.
+        l_f_motor.setPower(leftPower);
+        r_f_motor.setPower(leftPower);
+        r_f_motor.setPower(rightPower);
+        r_b_motor.setPower(rightPower);
+        telemetry.addData("Assigned powers...", "");
+        telemetry.update();
+        sleep(1000);
+
+        // rotate until turn is completed.
         if (degrees < 0)
         {
-            // On right rotate we have to get off zero first.
-            while (opModeIsActive() && getAngle() == 0)
-            {
-                l_b_motor.setPower(-power);
-                l_f_motor.setPower(-power);
-                r_b_motor.setPower(power);
-                r_f_motor.setPower(power);
-                //sleep(100);
-            }
-
-            do
-            {
-                power = pidRotate.performPID(getAngle()); // power will be - on right rotate.
-                l_b_motor.setPower(power);
-                l_f_motor.setPower(power);
-                r_b_motor.setPower(-power);
-                r_f_motor.setPower(-power);
-            } while (opModeIsActive() && !pidRotate.onTarget());
+            // On right turn we have to get off zero first.
+            while (opModeIsActive() && getAngle() == 0) {}
+            telemetry.addData("Got off zero", "");
+            telemetry.update();
+            sleep(1000);
+            while (opModeIsActive() && getAngle() > degrees) {}
         }
-        else    // left rotate.
-            do
-            {
-                power = pidRotate.performPID(getAngle()); // power will be + on left rotate.
-                l_b_motor.setPower(power);
-                l_f_motor.setPower(power);
-                r_b_motor.setPower(-power);
-                r_f_motor.setPower(-power);
-            } while (opModeIsActive() && !pidRotate.onTarget());
+        else    // left turn.
+        {
 
-        // rotate the motors off.
+            while (opModeIsActive() && getAngle() < degrees) {}
+
+        }
+
+
+        // turn the motors off.
+        telemetry.addData("Got out of loop", "");
+        telemetry.update();
         stopDriving();
 
         // wait for rotation to stop.
-        //sleep(10);
+        sleep(1000);
 
         // reset angle tracking on new heading.
         resetAngle();
     }
 
 
+
     //These methods handle moving to each location of a mineral during autonomous, as determined by the result of the tflow detector
     //BIG NOTE THIS ASSUMES WE HAVE ALREADY DETACHED FROM LANDER, WHICH IS NOT ACCURATE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    int angle = 38;
+    int angle = 20;
     double movPower = .15;
 
     public void right()
     {
-        for (int i = 0; i < 50; i++)
-            rotate(angle,movPower);
+        rotate(-angle,movPower);
         //rotateStart(true);
         //distance is actually about 38 inches, but we round to 40
         short distance = 4;
-        movement(getDistance(distance),movPower);
-        rotate(-angle,movPower);
+        //movement(getDistance(distance),movPower);
+        rotate(angle,movPower);
         //rotateStart(false);
         movement(getDistance(distance),movPower);
         //dump();
@@ -279,20 +299,22 @@ public class facing_auto2 extends LinearOpMode {
 
     public void left()
     {
-        for (int i = 0; i < 50; i++)
-            rotate(-angle,movPower);
+        rotate(angle,movPower);
+        telemetry.addData("we cookin", "fire");
+        telemetry.update();
+        sleep(5000);
         //rotateStart(false);
         //distance is actually about 38 inches, but we round to 40
         short distance = 4;
-        movement(getDistance(distance),movPower);
-        rotate(angle,movPower);
+        //movement(getDistance(distance),movPower);
+        rotate(-angle,movPower);
         //rotateStart(true);
-        movement(getDistance(distance),movPower);
+        //movement(getDistance(distance),movPower);
         //dump();
-        movement(getDistance(4),movPower);
+        //movement(getDistance(4),movPower);
         rotate(135,movPower);
         //rotateToCrater(false);
-        movement(getDistance(50),movPower);
+        //movement(getDistance(50),movPower);
 
     }
     public void center()
@@ -400,6 +422,8 @@ public class facing_auto2 extends LinearOpMode {
         else{
             center();
         }
+
+
 
 
 
