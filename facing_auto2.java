@@ -47,7 +47,7 @@ public class facing_auto2 extends LinearOpMode {
     BNO055IMU               imu;
     double                  globalAngle, power = .30, correction;
     private final double INCHES_PER_TIC = 0.011214285;
-    private final double wheelRatio = (22 / 1); //Not actually what we have pretty sure, needs to be changed. Yeah this is completel y wrong - Peter
+    private final double wheelRatio = (18.18 / 1); //Not actually what we have pretty sure, needs to be changed. Yeah this is completel y wrong - Peter
     PIDController           pidRotate, pidDrive;
     private GoldAlignDetector detector;
 
