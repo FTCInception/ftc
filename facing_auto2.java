@@ -106,7 +106,7 @@ public class facing_auto2 extends LinearOpMode {
     //This method converts the distance in inches to distance in number of tics
     public int getDistance(double inches)
     {
-        return (int)(Math.floor(inches*INCHES_PER_TIC));
+        return (int)(Math.floor(inches/INCHES_PER_TIC));
     }
 
 
