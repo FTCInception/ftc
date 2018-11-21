@@ -118,7 +118,7 @@ public class facing_auto2 extends LinearOpMode {
         l_f_motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         l_b_motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
-        r_f_motor.setTargetPosition((int)(distance*wheelRatio));
+        r_f_motor.setTargetPosition((int)(distance*wheelRatio));//wheel turns 1 time for every 18 motor turns
         r_b_motor.setTargetPosition((int)(distance*wheelRatio));
         l_f_motor.setTargetPosition((int)(distance*wheelRatio));
         l_b_motor.setTargetPosition((int)(distance*wheelRatio));
